@@ -1,0 +1,99 @@
+Practical Machine Learning Course Project : Writeup
+===================================================
+By : Nitin Agarwal
+------------------
+
+The model described below implements PCA (Principal Component Analysis) for dimensionality reduction and Random Forest
+with Cross Validation to train the data set.
+Following are the steps performed to train the given data, and perform classification on the given testing data set :
+
+Step 1 : Load the required packages
+```{r}
+set.seed(1234)
+library(corrplot)
+library(nnet)
+library(caret)
+```
+
+Step 2 : Load the training dataset
+```{r}
+alldata<-read.csv("/home/nitin/Downloads/pml-training.csv")
+```
+
+Step 3 : View the summary of data to get idea about the data
+```{r}
+summary(alldata)
+```
+
+From the above summary results we can see that their are lot of columns with many NA's. (eg. NA's 19216) and are Non Numeric (with #DIV/0!)
+Also many of the columns are non numeric.
+
+Step 4 : Remove all the columns with NA's.
+```{r}
+name <- names(alldata)
+col<-name[c(8:160)];
+colsNA <- c("max_roll_belt","max_picth_belt","min_roll_belt","min_pitch_belt","amplitude_roll_belt","amplitude_pitch_belt","var_total_accel_belt",
+            "avg_roll_belt","stddev_roll_belt","var_roll_belt","avg_pitch_belt","stddev_pitch_belt","var_pitch_belt","avg_yaw_belt","stddev_yaw_belt",
+            "var_yaw_belt","var_accel_arm","avg_roll_arm","stddev_roll_arm","var_roll_arm","avg_pitch_arm","stddev_pitch_arm","var_pitch_arm","avg_yaw_arm",
+            "stddev_yaw_arm","var_yaw_arm","max_roll_arm","max_picth_arm","max_yaw_arm","min_roll_arm","min_pitch_arm","min_yaw_arm","amplitude_roll_arm",
+            "amplitude_pitch_arm","amplitude_yaw_arm","max_roll_dumbbell","max_picth_dumbbell","min_roll_dumbbell","min_pitch_dumbbell","amplitude_roll_dumbbell","amplitude_pitch_dumbbell",
+            "var_accel_dumbbell","avg_roll_dumbbell","stddev_roll_dumbbell","var_roll_dumbbell","avg_pitch_dumbbell","stddev_pitch_dumbbell","var_pitch_dumbbell",
+            "avg_yaw_dumbbell","stddev_yaw_dumbbell","var_yaw_dumbbell","max_roll_forearm","max_picth_forearm","min_roll_forearm","min_pitch_forearm","amplitude_roll_forearm",
+            "amplitude_pitch_forearm","var_accel_forearm","avg_roll_forearm","stddev_roll_forearm","var_roll_forearm","avg_pitch_forearm","stddev_pitch_forearm",
+            "var_pitch_forearm","avg_yaw_forearm","stddev_yaw_forearm","var_yaw_forearm")
+
+col <- setdiff(col,colsNA)
+tempdata <- alldata[col]
+```
+
+Step 5 : Next we try to find the correlation between different features and plot the relationship
+```{r}
+#scale all the features
+tempdata.scale<- scale(tempdata[sapply(tempdata, is.numeric)],center=TRUE,scale=TRUE);
+
+#compute the correlation matrix
+corMatMy <- cor(tempdata.scale)
+
+#visualize the matrix, clustering features by correlation index.
+corrplot(corMatMy, order = "hclust")
+```
+
+Step 6 : Add the output variable "classe" to the tempdata and remove Non-Numeric columns
+```{r}
+tempdata<-tempdata[sapply(tempdata, is.numeric)] ## Removes Non-Numeric columns
+classe <- alldata[,"classe"]
+tempdata <- cbind.data.frame(tempdata,classe)
+```
+
+Step 7 : Partition the data into training set(75%) and testing set(25%)
+```{r}
+inTrain = createDataPartition(tempdata$classe, p = 3/4)[[1]]
+training = tempdata[ inTrain,]
+testing = tempdata[-inTrain,]
+```
+
+Step 8 : Since the number of features is large and their is high correlation between features, we use PCA to reduce the dimension of data.
+Here 53 is the output column, pcaComp = number of principal components
+```{r}
+preprocess <- preProcess(training[,-53],method="pca",pcaComp=30)
+trainpc <- predict(preprocess,training[,-53])
+```
+
+Step 9 : Now train the data using the principal components obtained in previous step. We are using Random Forest method for training.
+```{r}
+fit<-train(training$classe~.,method="rf",data=trainpc)
+```
+
+Step 10 : Once you have trained the model. Now use the model to make predictions on testing set.
+```{r}
+testpc <- predict(preprocess,testing[,-53])
+predictions <- predict(fit,testpc)
+```
+
+Step 11 : Now use the confusion matrix to test the accuracy of your model on testing set.
+```{r}
+confusionMatrix(testing$classe,predictions)
+```
+
+From the confusion matrix we can see that our model is 97.8% accurate on the testing set.
+So, it seems a quite good fit for our data, As most of the test samples are correctly classified.
